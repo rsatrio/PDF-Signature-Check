@@ -11,7 +11,6 @@ import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Collection;
-import java.util.Date;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
@@ -22,6 +21,7 @@ import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cms.CMSSignedData;
 import org.bouncycastle.cms.SignerInformation;
+import org.bouncycastle.tsp.TimeStampToken;
 import org.bouncycastle.util.encoders.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +47,7 @@ public class CheckPdfSignature implements Callable<Integer>{
         bis.read(contentSigned, 0, byteRange[1]);
         bis.skip(byteRange[2]-byteRange[1]-byteRange[0]);
         bis.read(contentSigned, byteRange[1], byteRange[3]);
-
+        bis.reset();
         return contentSigned;
 
     }
@@ -64,6 +64,7 @@ public class CheckPdfSignature implements Callable<Integer>{
             pdfDoc.getSignatureDictionaries().forEach(a-> {
                 try {
                     processSignature(a, pdfBytes);
+
                 } catch (Exception e) {
                     logApp.error("Error processing Signature",e);
                 }
@@ -92,7 +93,9 @@ public class CheckPdfSignature implements Callable<Integer>{
             System.exit(100);
         }
         if(!subFilter.trim().contains("ETSI.CAdES.detached") &&
-                !subFilter.trim().contains("adbe.pkcs7.detached"))  {
+                !subFilter.trim().contains("adbe.pkcs7.detached") &&
+                !subFilter.trim().contains("ETSI.RFC3161")
+                )  {
             logApp.error("Cannot process PDF Signature {} with subFilter {}",signature.getName(),
                     subFilter);
             System.exit(100);
@@ -110,21 +113,30 @@ public class CheckPdfSignature implements Callable<Integer>{
 
 
         //Get Attribute
-        Attribute attribute1 =signedData.getSignerInfos().iterator().next().getSignedAttributes().get(PKCSObjectIdentifiers.pkcs_9_at_messageDigest);       
-        Attribute attribute2 =signedData.getSignerInfos().iterator().next().getUnsignedAttributes().get(PKCSObjectIdentifiers.id_aa_signatureTimeStampToken);
-
+        Attribute attribute1 =signerInfo.getSignedAttributes().get(PKCSObjectIdentifiers.pkcs_9_at_messageDigest);
+        Attribute attribute2=null;
+        if(signerInfo.getUnsignedAttributes()!=null)    {
+            attribute2 =signerInfo.getUnsignedAttributes().get(PKCSObjectIdentifiers.id_aa_signatureTimeStampToken);
+        }
 
 
         //Get MD in CMS
-        String messageDigest=Base64.getEncoder().encodeToString(
-                Hex.decode(attribute1.getAttributeValues()[0].toString().substring(1)));
-
+        String messageDigest="";
+        if(subFilter.contains("ETSI.RFC3161"))  {
+            TimeStampToken timeToken=new TimeStampToken(signedData);
+            messageDigest=Base64.getEncoder().encodeToString(
+                    timeToken.getTimeStampInfo().getMessageImprintDigest());
+        }
+        else    {
+            messageDigest=Base64.getEncoder().encodeToString(
+                    Hex.decode(attribute1.getAttributeValues()[0].toString().substring(1)));
+        }
         MessageDigest digest=MessageDigest.getInstance(signerInfo.getDigestAlgOID());
         logApp.info("Digest Algorithm used:{}",digest.getAlgorithm());
 
         String signatureSID=signerInfo.getSID().getSerialNumber().toString(16);
         //Check timestamp token
-        if(attribute2.getAttributeValues().length>0)    {
+        if(attribute2!=null && attribute2.getAttributeValues().length>0)    {
             logApp.info("Signature ID {} contains timestamp",signatureSID);
         }
 
