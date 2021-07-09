@@ -191,10 +191,10 @@ public class CheckPdfSignature implements Callable<Integer>{
         logApp.info("Message Digest Signature ID {} in PDF:{}",signatureSID,mdPdf);
 
         if(mdPdf.equals(messageDigest)) {
-            logApp.info("Message Digest Signature ID {} is valid, pdf signature is VALID",signatureSID);
+            logApp.info("Message Digest Signature ID {} is valid, data integrity is OK",signatureSID);
         }
         else    {
-            logApp.info("Message Digest Signature ID {} is invalid, pdf signature is INVALID",signatureSID);
+            logApp.info("Message Digest Signature ID {} is invalid, data integrity is NOT OK",signatureSID);
         }
 
     }
