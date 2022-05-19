@@ -17,6 +17,9 @@ Use mvn package to build the module into jar file
 mvn clean package
 ```
 
+## Explanation
+You can find the detail explanation of this repository in [this medium blog](https://medium.com/javarevisited/simple-digital-signature-validation-on-pdf-17a66c1bf8d2).
+
 ## Usage
 - This example used to check validity of a certificate through OCSP:
 ```shell
